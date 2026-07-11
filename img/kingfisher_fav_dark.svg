@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Pied Kingfisher favicon">
+  <title>Pied Kingfisher</title>
+  <defs>
+    <clipPath id="fd-left">
+      <rect x="0" y="0" width="16" height="32"/>
+    </clipPath>
+    <clipPath id="fd-right">
+      <rect x="16" y="0" width="16" height="32"/>
+    </clipPath>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="32" height="32" fill="#0f1117" rx="5"/>
+
+  <!-- Left wing (green) -->
+  <polygon points="16,14 6,4 12,16" fill="#4ade80"/>
+
+  <!-- Right wing (red) -->
+  <polygon points="16,14 26,4 20,16" fill="#f87171"/>
+
+  <!-- Body — left green, right red -->
+  <ellipse cx="16" cy="19" rx="7" ry="4" fill="#22c55e" clip-path="url(#fd-left)"/>
+  <ellipse cx="16" cy="19" rx="7" ry="4" fill="#ef4444" clip-path="url(#fd-right)"/>
+
+  <!-- Head — left green, right red -->
+  <circle cx="16" cy="12" r="5" fill="#22c55e" clip-path="url(#fd-left)"/>
+  <circle cx="16" cy="12" r="5" fill="#ef4444" clip-path="url(#fd-right)"/>
+
+  <!-- Beak -->
+  <polygon points="14,17 18,17 16,26" fill="#fbbf24"/>
+</svg>

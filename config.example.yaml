@@ -1,0 +1,19 @@
+# diff.lab example configuration
+# Copy to config.yaml and adjust for your setup.
+
+machines:                    # optional; omit if all repos are local
+  myserver: user@diffhost.example.com  # name: ssh-destination
+
+targets:                     # required; at least one entry
+  - name: my-local-repo
+    machine: local           # "local" (default) or a key from machines:
+    repo: /path/to/repo
+
+  - name: my-remote-repo
+    machine: myserver
+    repo: /srv/repos/my-remote-repo
+
+# To add a Windows target:
+#  - name: my-windows-repo
+#    machine: winbox
+#    repo: C:/projects/my-windows-repo

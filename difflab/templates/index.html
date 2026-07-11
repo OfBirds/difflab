@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}diff.lab — targets{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <h1>Targets</h1>
+  <a class="refresh-button" href="/">Refresh</a>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Machine</th>
+      <th>Repo</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in dirty %}
+    <tr>
+      <td>{{ t.name }}</td>
+      <td>{{ t.machine }}</td>
+      <td>{{ t.repo }}</td>
+      <td>
+        <a href="/d/{{ t.name }}">diff</a>
+        &nbsp;
+        <a href="/raw/{{ t.name }}">raw</a>
+      </td>
+    </tr>
+    {% endfor %}
+    {% for e in errored %}
+    <tr class="error-row">
+      <td>{{ e.target.name }} <span class="error-marker">[ERROR]</span></td>
+      <td>{{ e.target.machine }}</td>
+      <td>{{ e.target.repo }}</td>
+      <td><span class="error-detail">{{ e.message }}</span></td>
+    </tr>
+    {% endfor %}
+    {% if not dirty and not errored %}
+    <tr><td colspan="4">No repos with local changes.</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+<p class="index-summary">
+  {{ dirty|length }} repo{% if dirty|length != 1 %}s{% endif %} with changes
+  {%- if errored %}, {{ errored|length }} errored{%- endif %}
+  — {{ clean_count }} clean hidden
+</p>
+{% endblock %}

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Pied Kingfisher logo">
+  <title>Pied Kingfisher</title>
+  <defs>
+    <clipPath id="k1-left">
+      <rect x="0" y="0" width="100" height="200"/>
+    </clipPath>
+    <clipPath id="k1-right">
+      <rect x="100" y="0" width="100" height="200"/>
+    </clipPath>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="200" height="200" fill="#0f1117" rx="12"/>
+
+  <!-- Wave line -->
+  <path d="M0 162 Q25 152 50 162 Q75 172 100 162 Q125 152 150 162 Q175 172 200 162 L200 200 L0 200 Z" fill="#161b27"/>
+  <path d="M0 165 Q25 155 50 165 Q75 175 100 165 Q125 155 150 165 Q175 175 200 165" stroke="#2dd4bf" stroke-width="1.5" fill="none" opacity="0.5"/>
+
+  <!-- Left wing (green) -->
+  <polygon points="100,95 52,38 78,100" fill="#4ade80" clip-path="url(#k1-left)"/>
+  <polygon points="100,95 52,38 78,100" fill="#4ade80" opacity="0.15"/>
+
+  <!-- Right wing (red) -->
+  <polygon points="100,95 148,38 122,100" fill="#f87171" clip-path="url(#k1-right)"/>
+  <polygon points="100,95 148,38 122,100" fill="#f87171" opacity="0.15"/>
+
+  <!-- Body — green left half -->
+  <ellipse cx="100" cy="108" rx="30" ry="13" fill="#22c55e" clip-path="url(#k1-left)"/>
+  <!-- Body — red right half -->
+  <ellipse cx="100" cy="108" rx="30" ry="13" fill="#ef4444" clip-path="url(#k1-right)"/>
+
+  <!-- Head — green left half -->
+  <circle cx="100" cy="88" r="13" fill="#22c55e" clip-path="url(#k1-left)"/>
+  <!-- Head — red right half -->
+  <circle cx="100" cy="88" r="13" fill="#ef4444" clip-path="url(#k1-right)"/>
+
+  <!-- Eye highlight -->
+  <circle cx="103" cy="85" r="3" fill="#0f1117"/>
+  <circle cx="104" cy="84" r="1" fill="#e2e8f0"/>
+
+  <!-- Beak pointing down (to strike) -->
+  <polygon points="95,98 105,98 100,130" fill="#fbbf24"/>
+
+  <!-- Subtle center divider -->
+  <line x1="100" y1="70" x2="100" y2="125" stroke="#0f1117" stroke-width="1" opacity="0.4"/>
+</svg>

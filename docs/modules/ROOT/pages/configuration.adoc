@@ -1,0 +1,111 @@
+= Configuration reference
+:description: Full reference for config.yaml, registry.yaml, and environment variables.
+
+== config.yaml
+
+The main configuration file.
+Resolved from `$DIFFLAB_CONFIG` env var if set, otherwise `./config.yaml` in the working directory.
+
+[source,yaml]
+----
+machines:                         # optional
+  myserver: user@diffhost.example.com   # name: ssh-destination
+
+targets:                          # required; at least one entry
+  - name: my-local-repo
+    machine: local                # "local" (default) or a machines key
+    repo: /path/to/repo
+
+  - name: my-remote-repo
+    machine: myserver
+    repo: /srv/repos/my-remote-repo
+
+  - name: my-windows-repo
+    machine: winbox
+    repo: C:/Users/alice/projects/myrepo
+----
+
+=== `machines`
+
+Optional mapping of machine names to SSH destinations (`user@host`).
+
+* The name `local` is reserved and cannot be used.
+* Destinations must not start with `-`.
+
+=== `targets`
+
+List of repositories to watch.
+Each entry must have:
+
+[cols="1,1,3"]
+|===
+| Field | Required | Description
+
+| `name`
+| yes
+| Identifier used in URLs (`/d/<name>`).
+  Must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`.
+  Must be unique.
+
+| `repo`
+| yes
+| Absolute path to the repository root.
+  Must not start with `-`.
+
+| `machine`
+| no (default: `local`)
+| `local` for a repo on the same host as difflab,
+  or a key from `machines` for a remote repo.
+|===
+
+== registry.yaml
+
+Automatically managed by the `/register` endpoint.
+Stored in `$DIFFLAB_DATA/registry.yaml` (default: `./data/registry.yaml`).
+
+Do not edit by hand while difflab is running.
+Enrolled targets are merged with `config.yaml` targets at startup; config-file targets take
+priority when names conflict.
+
+== Environment variables
+
+[cols="1,1,3"]
+|===
+| Variable | Default | Description
+
+| `DIFFLAB_CONFIG`
+| `./config.yaml`
+| Path to the configuration file.
+
+| `DIFFLAB_DATA`
+| `./data`
+| Directory for runtime data: SSH keypair, `registry.yaml`.
+
+| `DIFFLAB_ENROLL_TOKEN`
+| (unset)
+| Required to enable `POST /register`.
+  If unset, all enrollment requests return `503 Service Unavailable`.
+  Set to a long random string; treat it like a password.
+|===
+
+== Routes
+
+[cols="1,3"]
+|===
+| Route | Description
+
+| `GET /`
+| Index: repos with uncommitted changes listed first, errored targets marked, clean repos hidden.
+
+| `GET /d/<name>`
+| Colorized, collapsible HTML diff for the named target.
+
+| `GET /raw/<name>`
+| Plain-text diff (`Content-Type: text/plain`).
+
+| `GET /pubkey`
+| Container's SSH public key formatted as a ready-to-paste `authorized_keys` line.
+
+| `POST /register`
+| Enroll a machine. Token-gated via `DIFFLAB_ENROLL_TOKEN`. Returns 503 if token is unset.
+|===

@@ -1,0 +1,105 @@
+= Security model
+:description: How Pied Kingfisher (difflab) keeps your hosts safe.
+
+Pied Kingfisher is designed for a read-only, least-privilege posture.
+It runs git commands on remote hosts over SSH and renders the output in a browser.
+This page documents every security mechanism that keeps those operations safe.
+
+== Allowlisted operations only
+
+Only two git commands are ever executed:
+
+* `git diff` — show uncommitted working-tree changes
+* `git status --short` — determine whether a repo is dirty
+
+No writes.
+No pushes.
+No force-anything.
+The code does not `import subprocess` with arbitrary user-supplied strings.
+The allowed commands are assembled from discrete, validated parts.
+
+== shell=False everywhere
+
+Every subprocess call — local git, remote SSH, repo discovery — is invoked with `shell=False`.
+The command is always a Python `list` of strings, never a concatenated shell command string.
+This prevents shell injection regardless of what appears in repo paths or machine names.
+
+== Input validation at startup and enrollment time
+
+=== Target names
+
+Target names are validated against `^[A-Za-z0-9][A-Za-z0-9._-]*$` at config-load time and at
+`/register` time.
+Unknown target names return `404 Not Found`.
+The name is never interpolated into a shell command.
+
+=== Repo paths and SSH hostnames
+
+* Repo paths must not start with `-` (prevents them from being interpreted as flags).
+* SSH hostnames and usernames must not start with `-` (same reason).
+* Paths containing `"` are rejected during enrollment repo verification.
+
+=== Machine destinations
+
+SSH destinations from `config.yaml` must not start with `-`.
+
+== Shell-aware quoting for remote commands
+
+When difflab SSH-es into a remote host it must pass a command string over the SSH channel.
+That string is interpreted by the remote shell, so quoting must match the remote shell type.
+
+* **POSIX hosts:** `shlex.quote()` — produces POSIX-compliant single-quoted strings.
+* **Windows hosts (PowerShell):** double-quoted strings with internal `"` characters rejected
+  at enrollment time, since reliable escaping across PowerShell versions is not guaranteed.
+
+The remote shell type is detected automatically during enrollment (POSIX `find` attempted first;
+PowerShell fallback on failure) and stored in `registry.yaml` so subsequent diff fetches use the
+correct quoting.
+
+== Token-gated enrollment
+
+`POST /register` requires a bearer token that must match `DIFFLAB_ENROLL_TOKEN`.
+If the environment variable is unset, the endpoint returns `503 Service Unavailable` and
+enrollment is disabled entirely.
+Requests with a missing or wrong token return `401 Unauthorized`.
+
+Keep the token long (at least 32 random characters) and treat it like a password.
+Rotate it by restarting the container with a new value.
+
+== XSS prevention
+
+All diff and status output from git — including file names, hunk headers, and changed lines —
+is HTML-escaped before being inserted into the page.
+Jinja2 autoescape is enabled globally; no template uses `| safe` on user-controlled data.
+A `<script>` tag in a diff line renders as literal text, not executable code.
+
+== Restricted authorized_keys prefix
+
+The SSH public key served by `GET /pubkey` includes a restrictive prefix:
+
+[source,text]
+----
+no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAA... difflab
+----
+
+This limits the key to non-interactive command execution.
+It cannot be used to open a shell, forward ports, or forward the agent.
+
+== SSH key storage
+
+The container's SSH keypair is generated with `ssh-keygen -t ed25519` on first start and stored
+in `$DIFFLAB_DATA`.
+It is never transmitted over the network except as the public key on `GET /pubkey`.
+Mount `$DIFFLAB_DATA` as a named Docker volume so the keypair persists across container upgrades.
+
+== Timeout
+
+Every git and SSH call is subject to a 30-second timeout.
+A slow or hung remote host returns a `502 Bad Gateway` response rather than blocking the server.
+
+== What difflab cannot do
+
+* It cannot write to, commit to, push to, or modify any repository.
+* It cannot open an interactive shell on any enrolled host.
+* It cannot forward network connections.
+* It does not store credentials beyond the SSH keypair it generates itself.

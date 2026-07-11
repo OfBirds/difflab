@@ -1,0 +1,79 @@
+= What is Pied Kingfisher?
+:description: Pied Kingfisher lets you see uncommitted working-tree diffs across all your machines, from any browser.
+
+[NOTE]
+.One app, two names
+====
+*Pied Kingfisher* is the product name in the https://ofbirds.org[ofbirds.org] flock.
+*difflab* is its technical name, and it is what you will see everywhere in the tooling:
+the GitHub repo (https://github.com/OfBirds/difflab[OfBirds/difflab]), the container image
+(`ghcr.io/ofbirds/difflab`), and the config you write. Same app; don't let the two names
+confuse you.
+====
+
+== The itch
+
+You have half a dozen machines — a desktop, a laptop, a homelab server, maybe a spare box running
+a build agent — and code lives on all of them.
+Agents run across them too: they fetch, they patch, they stage hunks, and then they stop.
+Between every commit and the next there is an invisible gap: the working tree.
+
+Forges (GitHub, Gitea, Forgejo, cgit) show you commits, branches, and pull requests.
+None of them show you the stuff that isn't committed yet.
+
+Checking it means `ssh`-ing in, running `git diff`, and squinting at terminal output.
+From a phone that is painful.
+From another machine that is a context switch.
+Across several repos it becomes a chore you skip.
+
+== What it does
+
+Pied Kingfisher (difflab) is a small, self-hosted Flask app that checks your configured git
+repositories for uncommitted changes when you load a page and presents them as
+diff-colorized (add/del/hunk), collapsible, per-file diff views — available from any browser
+on your network.
+
+* One URL per repo: open it on your phone, your tablet, your other laptop.
+* Dirty repos float to the top of the index; clean repos are quietly hidden.
+* Remote repos are fetched over SSH — no agent software on the target machine.
+* Self-service enrollment: one `curl` on the target machine registers it and discovers all its
+  repos automatically.
+
+== Two-curl enrollment
+
+Getting a new machine into difflab takes two commands on the target host.
+
+**Step 1 — authorize the container's SSH key on the target host:**
+
+[source,bash]
+----
+curl -s http://difflab.example.com:8747/pubkey >> ~/.ssh/authorized_keys
+----
+
+**Step 2 — register the machine and discover repos:**
+
+[source,bash]
+----
+curl -s -X POST http://difflab.example.com:8747/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "token": "YOUR_ENROLL_TOKEN",
+    "name":  "devbox",
+    "host":  "192.0.2.10",
+    "user":  "alice",
+    "roots": ["/home/alice/projects"]
+  }'
+----
+
+That is it.
+No agent to install, no config file to edit by hand.
+The response lists every repo that was discovered under the specified roots.
+
+See xref:enrollment.adoc[Enrolling machines] for the full procedure, including Windows targets.
+
+== Flock values
+
+* *Your data stays yours.* Pied Kingfisher runs entirely on infrastructure you control.
+  Nothing is sent to any external service.
+* *Runnable on your own box.* A single `docker run` is all it takes.
+  No cloud account, no signup, no subscription.

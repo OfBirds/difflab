@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}diff.lab — {{ target.name }}{% endblock %}
+{% block content %}
+<h1>{{ target.name }}</h1>
+<h2>Status</h2>
+{% if status_rows %}
+<div class="status-block">
+  {% for row in status_rows %}
+  <button type="button" class="status-row" data-anchor="{{ row.anchor }}" data-copy-path="{{ row.path }}">
+    <span class="status-file"><span class="status-marker">{{ row.marker }}</span> {{ row.path }}</span>
+    <span class="status-row-tools">
+      {% if row.counts.binary %}
+      <span class="change-counts" aria-label="Binary file changed"><span class="count-add">+/-</span></span>
+      {% else %}
+      <span class="change-counts"><span class="count-add">+{{ row.counts.added }}</span><span class="count-del">-{{ row.counts.deleted }}</span></span>
+      {% endif %}
+      <span class="copy-path-button" aria-label="Copy path">copy</span>
+    </span>
+  </button>
+  {% endfor %}
+</div>
+{% else %}
+<div class="status-block">(no changes)</div>
+{% endif %}
+
+{% if clean %}
+<div class="clean-banner">Working tree clean — no uncommitted changes.</div>
+{% else %}
+<h2>Diff</h2>
+{{ rendered_diff|safe }}
+{% endif %}
+{% endblock %}

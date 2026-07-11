@@ -1,0 +1,16 @@
+services:
+  difflab:
+    image: difflab:latest
+    build: .
+    ports:
+      - "8747:8747"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - difflab-data:/data
+    environment:
+      DIFFLAB_DATA: /data
+      DIFFLAB_ENROLL_TOKEN: ${DIFFLAB_ENROLL_TOKEN:-}
+    restart: unless-stopped
+
+volumes:
+  difflab-data:

@@ -1,0 +1,155 @@
+= Enrolling machines
+:description: Add a remote machine to Pied Kingfisher with two curl commands.
+
+Self-service enrollment lets any host join difflab with plain `curl` — no agent software to
+install, no manual config file edits.
+The enrollment endpoint discovers git repositories on the target host automatically.
+
+== How it works
+
+1. The container generates an SSH keypair on first start (stored in `$DIFFLAB_DATA`).
+2. Step 1 adds the container's public key to the target host's `authorized_keys` with a
+   restrictive prefix that limits what the key can do.
+3. Step 2 sends a registration request to difflab; difflab SSH-es into the target, scans the
+   specified roots for git repositories, and stores the results in `registry.yaml`.
+
+Enrolled targets survive restarts — difflab reloads `registry.yaml` at startup.
+
+== Step 1 — authorize the container's key
+
+Run the appropriate command **on the target machine** (not the machine running difflab).
+
+**Linux / macOS:**
+
+[source,bash]
+----
+curl -s http://difflab.example.com:8747/pubkey >> ~/.ssh/authorized_keys
+----
+
+**Windows (PowerShell):**
+
+[source,powershell]
+----
+(Invoke-WebRequest http://difflab.example.com:8747/pubkey).Content |
+    Add-Content "$env:USERPROFILE\.ssh\authorized_keys"
+----
+
+The `GET /pubkey` endpoint returns a single `authorized_keys` line with a restrictive prefix:
+
+[source,text]
+----
+no-pty,no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 AAAA... difflab
+----
+
+This restricts the key to non-interactive commands only.
+
+== Step 2 — register the machine
+
+Send a registration request to difflab **from any machine** (including the target itself).
+
+**Linux / macOS:**
+
+[source,bash]
+----
+curl -s -X POST http://difflab.example.com:8747/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "token": "YOUR_ENROLL_TOKEN",
+    "name":  "devbox",
+    "host":  "192.0.2.10",
+    "user":  "alice",
+    "port":  22,
+    "roots": ["/home/alice/projects"]
+  }'
+----
+
+**Windows (PowerShell):**
+
+[source,powershell]
+----
+Invoke-RestMethod http://difflab.example.com:8747/register -Method POST `
+  -ContentType 'application/json' `
+  -Body '{
+    "token": "YOUR_ENROLL_TOKEN",
+    "name":  "winbox",
+    "host":  "192.0.2.20",
+    "user":  "alice",
+    "port":  22,
+    "roots": ["C:/Users/alice/projects"]
+  }'
+----
+
+=== Request fields
+
+[cols="1,1,3"]
+|===
+| Field | Required | Description
+
+| `token`
+| yes
+| Must match `DIFFLAB_ENROLL_TOKEN`.
+
+| `name`
+| yes
+| Short identifier for this machine (`^[A-Za-z0-9][A-Za-z0-9._-]*$`).
+  Used as a prefix for discovered target names.
+
+| `host`
+| yes
+| SSH hostname or IP address of the target machine.
+
+| `user`
+| yes
+| SSH username.
+
+| `port`
+| no (default `22`)
+| SSH port.
+
+| `roots`
+| one of `roots`/`repos`
+| List of directory paths to scan for git repos (up to 3 levels deep).
+  Directories whose path contains a component starting with `.` are skipped.
+
+| `repos`
+| one of `roots`/`repos`
+| Explicit list of repo paths.
+  Bypasses the automatic scan and the hidden-path filter.
+|===
+
+=== Response
+
+[source,json]
+----
+{"machine": "devbox", "targets": ["devbox-myproject", "devbox-other"], "errors": []}
+----
+
+`targets` lists the names of the discovered repos now tracked by difflab.
+`errors` lists any paths that could not be verified as git repositories.
+
+== Enabling OpenSSH Server on Windows
+
+If the target is a Windows machine without SSH enabled:
+
+[source,powershell]
+----
+Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+Set-Service sshd -StartupType Automatic
+Start-Service sshd
+New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server' `
+  -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+----
+
+[WARNING]
+====
+On Windows, OpenSSH uses `%ProgramData%\ssh\administrators_authorized_keys` for accounts in the
+Administrators group — *not* `%USERPROFILE%\.ssh\authorized_keys`. If the target user is an
+administrator, pipe `GET /pubkey` into the `administrators_authorized_keys` file instead.
+====
+
+== Name conflicts
+
+If a discovered repo's auto-generated name conflicts with an existing target (from `config.yaml`
+or a previous enrollment), a numeric suffix is appended automatically: `devbox-myrepo-2`, etc.
+
+Config-file targets always take priority — enrollment will never overwrite them.
