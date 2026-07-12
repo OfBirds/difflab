@@ -77,13 +77,13 @@
     }
     .nav-home:hover { opacity: .75; }
     .nav-home img { height: 1.75rem; width: auto; display: block; }
-    .nav-logo--dark { display: none; }
+    .nav-home .nav-logo--dark { display: none; }
     @media (prefers-color-scheme: dark) {
-      .nav-logo--light { display: none; }
-      .nav-logo--dark { display: block; }
+      .nav-home .nav-logo--light { display: none; }
+      .nav-home .nav-logo--dark { display: block; }
     }
-    html[data-theme="light"] .nav-logo--dark { display: none; }
-    html[data-theme="light"] .nav-logo--light { display: block; }
+    html[data-theme="light"] .nav-home .nav-logo--dark { display: none; }
+    html[data-theme="light"] .nav-home .nav-logo--light { display: block; }
     html[data-theme="dark"] .nav-logo--light { display: none; }
     html[data-theme="dark"] .nav-logo--dark { display: block; }
     button#theme-toggle {
