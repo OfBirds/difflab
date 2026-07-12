@@ -20,6 +20,18 @@ A self-hosted Flask app that shows **uncommitted working-tree diffs** of configu
 the thing Gitea and cgit don't show. Browse any repo's `git diff` output from any device on your
 LAN, with diff-colorized (add/del/hunk), collapsible per-file views and dark/light mode.
 
+## Screenshots
+
+The Targets home page — dirty repos across every enrolled machine, in dark and light mode:
+
+![Home (dark)](docs/modules/ROOT/assets/images/screens/index-dark.png)
+![Home (light)](docs/modules/ROOT/assets/images/screens/index-light.png)
+
+A rendered working-tree diff, in dark and light mode:
+
+![Diff view (dark)](docs/modules/ROOT/assets/images/screens/diff-dark.png)
+![Diff view (light)](docs/modules/ROOT/assets/images/screens/diff-light.png)
+
 ## Quickstart
 
 ```bash

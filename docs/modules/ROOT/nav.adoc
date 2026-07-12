@@ -4,3 +4,4 @@
 ** xref:enrollment.adoc[Enrolling machines]
 ** xref:configuration.adoc[Configuration reference]
 ** xref:security.adoc[Security model]
+** xref:screens.adoc[Screenshots]

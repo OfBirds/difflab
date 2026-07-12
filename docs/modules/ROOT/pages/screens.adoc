@@ -1,0 +1,27 @@
+= Screenshots
+:description: A look at Pied Kingfisher — the Targets home page and a rendered working-tree diff, in dark and light mode.
+
+Pied Kingfisher runs entirely in the browser, with a dark and light theme.
+Below is a quick look at the two screens you will spend the most time on: the Targets
+home page, which lists every enrolled machine's dirty repos, and a rendered
+working-tree diff.
+
+== Home
+
+The Targets home page — dirty repos across every enrolled machine.
+
+.Home (dark)
+image::screens/index-dark.png[Home (dark)]
+
+.Home (light)
+image::screens/index-light.png[Home (light)]
+
+== Diff view
+
+A rendered working-tree diff, diff-colorized and collapsible per file.
+
+.Diff view (dark)
+image::screens/diff-dark.png[Diff view (dark)]
+
+.Diff view (light)
+image::screens/diff-light.png[Diff view (light)]
