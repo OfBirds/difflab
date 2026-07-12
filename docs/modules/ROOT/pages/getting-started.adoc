@@ -1,0 +1,96 @@
+= Getting started
+:description: Run Pied Kingfisher (difflab) with Docker or Docker Compose.
+
+The fastest way to run Pied Kingfisher is with the pre-built container image.
+
+== Prerequisites
+
+* Docker (or Docker Compose v2)
+* An SSH key pair for the container to use when reaching remote machines
+  (generated automatically on first run — no action needed)
+
+== Docker quickstart
+
+[source,bash]
+----
+docker run -d \
+  --name difflab \
+  -p 8747:8747 \
+  -v /path/to/your/config.yaml:/app/config.yaml:ro \
+  -v difflab-data:/data \
+  -e DIFFLAB_DATA=/data \
+  -e DIFFLAB_ENROLL_TOKEN=change-this-token \
+  ghcr.io/ofbirds/difflab:latest
+----
+
+Open http://localhost:8747 in your browser.
+
+The `/data` volume stores the SSH keypair (auto-generated on first run) and the enrollment
+registry (`registry.yaml`).
+Both survive container restarts and upgrades.
+
+== Docker Compose quickstart
+
+Save a `docker-compose.yml` alongside your `config.yaml`:
+
+[source,yaml]
+----
+services:
+  difflab:
+    image: ghcr.io/ofbirds/difflab:latest
+    restart: unless-stopped
+    ports:
+      - "8747:8747"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - difflab-data:/data
+    environment:
+      DIFFLAB_DATA: /data
+      DIFFLAB_ENROLL_TOKEN: change-this-token
+
+volumes:
+  difflab-data:
+----
+
+Then:
+
+[source,bash]
+----
+DIFFLAB_ENROLL_TOKEN=change-this-token docker compose up -d
+----
+
+== Minimal config.yaml
+
+[source,yaml]
+----
+targets:
+  - name: my-local-repo
+    repo: /path/to/repo
+----
+
+See xref:configuration.adoc[Configuration reference] for the full schema including remote SSH targets.
+
+== Running from source
+
+[source,bash]
+----
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp config.example.yaml config.yaml
+# edit config.yaml
+python -m difflab
+----
+
+For development with hot-reload:
+
+[source,bash]
+----
+flask --app difflab run --debug
+----
+
+== Next steps
+
+* xref:enrollment.adoc[Enroll a remote machine] — one curl on the target, no manual config edits.
+* xref:configuration.adoc[Configuration reference] — full config.yaml schema and environment variables.
+* xref:security.adoc[Security model] — understand what difflab can and cannot do on your hosts.

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}diff.lab — {{ target.display_name }}{% endblock %}
+{% block content %}
+<div class="diff-page-header">
+  <h1>{{ target.display_name }}</h1>
+  <span class="diff-page-machine">{{ target.machine }}</span>
+</div>
+<details class="status-details" open>
+<summary class="status-heading">Status{% if status_rows %} ({{ status_rows|length }} file{% if status_rows|length != 1 %}s{% endif %} · +{{ total_added }} −{{ total_deleted }}{% if untracked_count %} · {{ untracked_count }} untracked{% endif %}){% endif %}</summary>
+{% if status_rows %}
+<div class="status-block">
+  {% for row in status_rows %}
+  {% if row.untracked %}
+  <div class="status-row" data-copy-path="{{ row.path }}">
+    <span class="status-file"><span class="status-marker">{{ row.marker }}</span> {{ row.path }}</span>
+    <span class="status-row-tools">
+      <span class="change-counts change-counts--untracked">untracked</span>
+      <span class="copy-path-button" aria-label="Copy path">copy</span>
+    </span>
+  </div>
+  {% else %}
+  <button type="button" class="status-row" data-anchor="{{ row.anchor }}" data-copy-path="{{ row.path }}">
+    <span class="status-file"><span class="status-marker">{{ row.marker }}</span> {{ row.path }}</span>
+    <span class="status-row-tools">
+      {% if row.counts.binary %}
+      <span class="change-counts" aria-label="Binary file changed"><span class="count-add">+/-</span></span>
+      {% else %}
+      <span class="change-counts"><span class="count-add">+{{ row.counts.added }}</span><span class="count-del">-{{ row.counts.deleted }}</span></span>
+      {% endif %}
+      <span class="copy-path-button" aria-label="Copy path">copy</span>
+    </span>
+  </button>
+  {% endif %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="status-block">(no changes)</div>
+{% endif %}
+</details>
+
+{% if clean %}
+{% if untracked_count %}
+<div class="clean-banner">No uncommitted changes to tracked files — {{ untracked_count }} untracked file{% if untracked_count != 1 %}s{% endif %}.</div>
+{% else %}
+<div class="clean-banner">Working tree clean — no uncommitted changes.</div>
+{% endif %}
+{% else %}
+<h2>Diff</h2>
+{{ rendered_diff|safe }}
+{% endif %}
+{% endblock %}

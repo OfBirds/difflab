@@ -1,0 +1,6 @@
+* xref:index.adoc[What is Pied Kingfisher?]
+* Using difflab
+** xref:getting-started.adoc[Getting started]
+** xref:enrollment.adoc[Enrolling machines]
+** xref:configuration.adoc[Configuration reference]
+** xref:security.adoc[Security model]

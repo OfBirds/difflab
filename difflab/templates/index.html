@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}diff.lab — targets{% endblock %}
+{% block content %}
+<h1>Targets</h1>
+<p class="index-summary" id="index-summary">
+  Checking {{ total_count }} repo{% if total_count != 1 %}s{% endif %} on {{ machines|length }} machine{% if machines|length != 1 %}s{% endif %}…
+</p>
+<noscript><p style="margin-bottom:.75rem">Enable JavaScript for live status; rows below list all configured targets.</p></noscript>
+<table>
+  <thead>
+    <tr>
+      <th data-sort-col="0" aria-sort="none"><button class="sort-btn">Name</button></th>
+      <th data-sort-col="1" aria-sort="none"><button class="sort-btn">Machine</button></th>
+      <th data-sort-col="2" aria-sort="none"><button class="sort-btn">Repo</button></th>
+      <th data-sort-col="3" data-sort-type="numeric" aria-sort="none"><button class="sort-btn">Files</button></th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for machine, mtargets in machines.items() %}
+    {% for t in mtargets %}
+    <tr data-name="{{ t.name }}" data-machine="{{ machine }}" data-state="pending" tabindex="0">
+      <td>{{ t.display_name }}</td>
+      <td>{{ t.machine }}</td>
+      <td>{{ t.repo }}</td>
+      <td class="files-cell">…</td>
+      <td class="status-cell"><span class="status-pending">checking…</span></td>
+    </tr>
+    {% endfor %}
+    {% endfor %}
+  </tbody>
+</table>
+<script>
+var MACHINES = {{ machines.keys()|list|tojson }};
+(function () {
+  var FORCE_KEY = 'difflab_force';
+  var CACHE_PFX = 'difflab_status_';
+  var CACHE_TTL = 60000;
+  var pending = { total: {{ total_count }}, remaining: MACHINES.length, clean: 0, dirty: 0, errored: 0 };
+  var oldestTs = null;
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function bindRow(row) {
+    row.addEventListener('click', function (event) {
+      if (event.target.closest('a, button')) return;
+      window.location.href = row.dataset.href;
+    });
+    row.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') window.location.href = row.dataset.href;
+    });
+  }
+
+  function updateSummary() {
+    if (pending.remaining > 0) return;
+    var summary = document.getElementById('index-summary');
+    if (!summary) return;
+    var parts = [];
+    if (pending.dirty > 0) {
+      parts.push(pending.dirty + ' repo' + (pending.dirty !== 1 ? 's' : '') + ' with changes');
+    }
+    if (pending.errored > 0) {
+      parts.push(pending.errored + ' errored');
+    }
+    var cleanText = pending.clean + ' clean hidden';
+    var mainText = (parts.length ? parts.join(', ') + ' — ' : '') + cleanText;
+    if (oldestTs !== null) {
+      var d = new Date(oldestTs);
+      var time = d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+      summary.innerHTML = escHtml(mainText) + ' <span style="opacity:.6;font-size:.9em">\xb7 as of ' + escHtml(time) + '</span>';
+    } else {
+      summary.textContent = mainText;
+    }
+  }
+
+  function applyMachineResult(data, ts) {
+    pending.remaining--;
+    if (ts !== null && (oldestTs === null || ts < oldestTs)) oldestTs = ts;
+    data.results.forEach(function (result) {
+      var row = document.querySelector('tr[data-name="' + result.name + '"]');
+      if (!row) return;
+      if (result.state === 'clean') {
+        row.parentNode.removeChild(row);
+        pending.clean++;
+      } else if (result.state === 'dirty') {
+        var canonical = '/d/' + data.machine + '/' + result.display_name;
+        var rawCanonical = '/raw/' + data.machine + '/' + result.display_name;
+        row.dataset.state = 'dirty';
+        row.dataset.href = canonical;
+        var cell = row.querySelector('.status-cell');
+        cell.innerHTML = '<a href="' + escHtml(canonical) + '">diff</a>&nbsp;<a href="' + escHtml(rawCanonical) + '">raw</a>';
+        var filesCell = row.querySelector('.files-cell');
+        if (filesCell != null) filesCell.textContent = result.file_count != null ? String(result.file_count) : '—';
+        bindRow(row);
+        pending.dirty++;
+      } else {
+        row.dataset.state = 'error';
+        row.classList.add('error-row');
+        var nameCell = row.cells[0];
+        nameCell.innerHTML = escHtml(nameCell.textContent) + ' <span class="error-marker">[ERROR]</span>';
+        var cell = row.querySelector('.status-cell');
+        var detail = result.error ? (result.error.detail || '') : '';
+        var msg = result.error ? (result.error.message || 'Unknown error') : 'Unknown error';
+        cell.innerHTML = '<span class="error-detail" title="' + escHtml(detail) + '">' + escHtml(msg) + '</span>';
+        var filesCell = row.querySelector('.files-cell');
+        if (filesCell != null) filesCell.textContent = '—';
+        pending.errored++;
+      }
+    });
+    updateSummary();
+  }
+
+  function applyMachineError(m) {
+    pending.remaining--;
+    var rows = document.querySelectorAll('tr[data-machine="' + m + '"][data-state="pending"]');
+    rows.forEach(function (row) {
+      row.dataset.state = 'error';
+      row.classList.add('error-row');
+      var nameCell = row.cells[0];
+      nameCell.innerHTML = escHtml(nameCell.textContent) + ' <span class="error-marker">[ERROR]</span>';
+      var cell = row.querySelector('.status-cell');
+      cell.innerHTML = '<span class="error-detail">Status check failed</span>';
+      var filesCell = row.querySelector('.files-cell');
+      if (filesCell != null) filesCell.textContent = '—';
+      pending.errored++;
+    });
+    updateSummary();
+  }
+
+  function fetchMachine(m) {
+    fetch('/api/status/' + encodeURIComponent(m))
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        var ts = Date.now();
+        try { sessionStorage.setItem(CACHE_PFX + m, JSON.stringify({data: data, ts: ts})); } catch (e) {}
+        applyMachineResult(data, ts);
+      })
+      .catch(function () { applyMachineError(m); });
+  }
+
+  function loadMachine(m, force) {
+    if (!force) {
+      try {
+        var raw = sessionStorage.getItem(CACHE_PFX + m);
+        if (raw) {
+          var entry = JSON.parse(raw);
+          if (Date.now() - entry.ts < CACHE_TTL) {
+            applyMachineResult(entry.data, entry.ts);
+            return;
+          }
+        }
+      } catch (e) {}
+    }
+    fetchMachine(m);
+  }
+
+  window.addEventListener('pageshow', function (ev) {
+    if (ev.persisted) return;
+    var navType = '';
+    try { navType = performance.getEntriesByType('navigation')[0].type; } catch (e) {}
+    var force = navType === 'reload' || sessionStorage.getItem(FORCE_KEY) === '1';
+    sessionStorage.removeItem(FORCE_KEY);
+    MACHINES.forEach(function (m) { loadMachine(m, force); });
+  });
+
+  document.querySelectorAll('th[data-sort-col]').forEach(function (th) {
+    th.querySelector('.sort-btn').addEventListener('click', function () {
+      var col = parseInt(th.dataset.sortCol, 10);
+      var asc = th.getAttribute('aria-sort') !== 'ascending';
+      document.querySelectorAll('th[data-sort-col]').forEach(function (t) { t.setAttribute('aria-sort', 'none'); });
+      th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+      var tbody = document.querySelector('table tbody');
+      var rows = Array.from(tbody.querySelectorAll('tr')).filter(function (r) { return r.cells.length > 1; });
+      var isNumeric = th.dataset.sortType === 'numeric';
+      rows.sort(function (a, b) {
+        var av = (a.cells[col] ? a.cells[col].textContent : '').trim();
+        var bv = (b.cells[col] ? b.cells[col].textContent : '').trim();
+        if (isNumeric) {
+          var an = parseInt(av, 10); if (isNaN(an)) an = -1;
+          var bn = parseInt(bv, 10); if (isNaN(bn)) bn = -1;
+          return asc ? an - bn : bn - an;
+        }
+        av = av.replace(/\[ERROR\]\s*$/, '').trim().toLowerCase();
+        bv = bv.replace(/\[ERROR\]\s*$/, '').trim().toLowerCase();
+        return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+      rows.forEach(function (r) { tbody.appendChild(r); });
+    });
+  });
+})();
+</script>
+{% endblock %}

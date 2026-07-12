@@ -1,0 +1,5 @@
+name: kingfisher
+title: Pied Kingfisher
+version: ~
+nav:
+  - modules/ROOT/nav.adoc
