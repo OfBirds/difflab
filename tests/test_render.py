@@ -57,6 +57,35 @@ index abc..000
 -deleted content
 """
 
+NEW_FILE_MODE_DIFF = """\
+diff --git a/new.py b/new.py
+new file mode 100644
+index 000..111
+--- /dev/null
++++ b/new.py
+@@ -0,0 +1,1 @@
++new content
+"""
+
+RENAME_DIFF = """\
+diff --git a/old.py b/new.py
+similarity index 100%
+rename from old.py
+rename to new.py
+"""
+
+MODE_CHANGE_DIFF = """\
+diff --git a/script.sh b/script.sh
+old mode 100644
+new mode 100755
+"""
+
+BINARY_DIFF = """\
+diff --git a/img.png b/img.png
+index 111..222
+Binary files a/img.png and b/img.png differ
+"""
+
 
 def test_classes_present_in_diff():
     html = render_diff_html(SAMPLE_DIFF)
@@ -278,3 +307,38 @@ def test_parse_numstat_zero_counts():
     assert counts["empty.py"] == {"added": 0, "deleted": 0, "binary": False}
     total_added = sum(c["added"] for c in counts.values() if not c.get("binary"))
     assert total_added == 0
+
+
+def test_new_file_mode_gets_diff_meta():
+    """new file mode lines should get diff-meta class."""
+    html = render_diff_html(NEW_FILE_MODE_DIFF, {})
+    count = html.count('class="diff-meta"')
+    assert count >= 5  # diff --git, new file mode, index, ---, +++
+
+
+def test_deleted_file_mode_gets_diff_meta():
+    """deleted file mode lines should get diff-meta class."""
+    html = render_diff_html(DELETION_DIFF, {})
+    count = html.count('class="diff-meta"')
+    assert count >= 5  # diff --git, deleted file mode, index, ---, +++
+
+
+def test_rename_meta_lines_get_diff_meta():
+    """rename from/to and similarity index lines should get diff-meta class."""
+    html = render_diff_html(RENAME_DIFF, {})
+    count = html.count('class="diff-meta"')
+    assert count >= 4  # diff --git, similarity index, rename from, rename to
+
+
+def test_mode_change_gets_diff_meta():
+    """old mode / new mode lines should get diff-meta class."""
+    html = render_diff_html(MODE_CHANGE_DIFF, {})
+    count = html.count('class="diff-meta"')
+    assert count >= 3  # diff --git, old mode, new mode
+
+
+def test_binary_files_diff_gets_diff_meta():
+    """Binary files ... differ lines should get diff-meta class."""
+    html = render_diff_html(BINARY_DIFF, {})
+    count = html.count('class="diff-meta"')
+    assert count >= 3  # diff --git, index, Binary files

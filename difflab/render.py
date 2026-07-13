@@ -11,7 +11,24 @@ _MINUS_PATH_RE = re.compile(r"^--- a/(.+)$")
 _HUNK_RE = re.compile(r"^@@")
 _ADD_RE = re.compile(r"^\+")
 _DEL_RE = re.compile(r"^-")
-_META_RE = re.compile(r"^(index |--- |--- /dev/null|\+\+\+ )")
+_META_RE = re.compile(
+    r"^(?:"
+    r"index |"
+    r"new file mode |"
+    r"deleted file mode |"
+    r"old mode |"
+    r"new mode |"
+    r"similarity index |"
+    r"dissimilarity index |"
+    r"rename from |"
+    r"rename to |"
+    r"copy from |"
+    r"copy to |"
+    r"Binary files .+ differ|"
+    r"--- |"
+    r"\+\+\+ "
+    r")"
+)
 
 
 def diff_anchor_id(path: str) -> str:
