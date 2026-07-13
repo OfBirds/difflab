@@ -402,7 +402,7 @@ def test_git_error_returns_502(client, monkeypatch):
 def test_build_command_local():
     t = Target(name="x", machine="local", repo=LOCAL_REPO, ssh_host=None)
     cmd = build_command(t, "diff")
-    assert cmd == ["git", "-C", LOCAL_REPO, "--no-pager", "diff"]
+    assert cmd == ["git", "-C", LOCAL_REPO, "--no-pager", "diff", "HEAD"]
 
 
 def test_build_command_remote():
@@ -452,6 +452,82 @@ def test_build_command_posix_uses_shlex_quote():
     cmd = build_command(t, "diff")
     remote = cmd[-1]
     assert shlex.quote("/home/alice/my repo") in remote
+
+
+# ── New / deleted file handling ─────────────────────────────────────────────
+# git diff HEAD includes both staged and unstaged changes, so staged new
+# and deleted files (which git diff without HEAD would miss) are rendered.
+
+STAGED_NEW_DIFF = """\
+diff --git a/newfile.py b/newfile.py
+new file mode 100644
+index 0000000..abc1234
+--- /dev/null
++++ b/newfile.py
+@@ -0,0 +1,2 @@
++print("hello")
++print("world")
+"""
+
+STAGED_DELETED_DIFF = """\
+diff --git a/oldfile.py b/oldfile.py
+deleted file mode 100644
+index abc1234..0000000
+--- a/oldfile.py
++++ /dev/null
+@@ -1,2 +0,0 @@
+-print("goodbye")
+-print("cruel world")
+"""
+
+
+def test_diff_view_renders_staged_new_file(client, monkeypatch):
+    def fake_execute(argv, **kw):
+        if "--numstat" in argv:
+            return "2\t0\tnewfile.py\n"
+        if "--no-pager" in argv:
+            return STAGED_NEW_DIFF
+        return "A  newfile.py\n"
+    monkeypatch.setattr(gitops_mod, "_execute", fake_execute)
+    resp = client.get("/d/local/diff-lab")
+    assert resp.status_code == 200
+    data = resp.data.decode()
+    assert "newfile.py" in data
+    assert "diff-add" in data
+    assert 'print("hello")' in data
+    assert 'data-anchor="diff-' in data
+
+
+def test_diff_view_renders_staged_deleted_file(client, monkeypatch):
+    def fake_execute(argv, **kw):
+        if "--numstat" in argv:
+            return "0\t2\toldfile.py\n"
+        if "--no-pager" in argv:
+            return STAGED_DELETED_DIFF
+        return "D  oldfile.py\n"
+    monkeypatch.setattr(gitops_mod, "_execute", fake_execute)
+    resp = client.get("/d/local/diff-lab")
+    assert resp.status_code == 200
+    data = resp.data.decode()
+    assert "oldfile.py" in data
+    assert "diff-del" in data
+    assert 'print("goodbye")' in data
+
+
+def test_diff_view_status_heading_counts_staged_new_deleted(client, monkeypatch):
+    def fake_execute(argv, **kw):
+        if "--numstat" in argv:
+            return "2\t0\tnewfile.py\n0\t2\toldfile.py\n"
+        if "--no-pager" in argv:
+            return STAGED_NEW_DIFF + "\n" + STAGED_DELETED_DIFF
+        return "A  newfile.py\nD  oldfile.py\n"
+    monkeypatch.setattr(gitops_mod, "_execute", fake_execute)
+    resp = client.get("/d/local/diff-lab")
+    assert resp.status_code == 200
+    data = resp.data.decode()
+    assert "2 files" in data
+    assert "+2" in data
+    assert "−2" in data
 
 
 def test_diff_view_untracked_only_banner(client, monkeypatch):

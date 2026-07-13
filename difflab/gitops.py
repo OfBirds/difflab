@@ -86,8 +86,8 @@ def classify_error(returncode: int, stderr: str) -> tuple[ErrorKind, str]:
 
 
 ALLOWED: dict[str, tuple[str, ...]] = {
-    "diff": ("--no-pager", "diff"),
-    "numstat": ("--no-pager", "diff", "--numstat"),
+    "diff": ("--no-pager", "diff", "HEAD"),
+    "numstat": ("--no-pager", "diff", "--numstat", "HEAD"),
     "status": ("status", "--short"),
 }
 
