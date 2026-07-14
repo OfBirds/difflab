@@ -1,10 +1,11 @@
 #!/bin/sh
 # difflab git-gate — forced-command filter for the container SSH key.
 #
-# Allows ONLY these four command shapes:
+# Allows ONLY these command shapes (the trailing HEAD ref is optional so the
+# gate accepts app versions from before and after the diff-HEAD change):
 #   difflab-batch-status<US>path1<US>path2…  (batch status; <US>=0x1F)
-#   git -C <path> --no-pager diff
-#   git -C <path> --no-pager diff --numstat
+#   git -C <path> --no-pager diff [HEAD]
+#   git -C <path> --no-pager diff --numstat [HEAD]
 #   git -C <path> status --short
 #
 # Any other command is rejected with "difflab: command not permitted".
@@ -64,18 +65,28 @@ esac
 rest="${cmd#git -C }"
 
 # Identify operation by matching the known tail suffixes.
-# Order: numstat before diff so the longer suffix wins.
+# Order: longest suffix first (numstat before diff, HEAD variants before the
+# bare ones) so the most specific pattern wins. `ref` captures the optional
+# trailing HEAD so it can be passed through to git unchanged.
 case "$rest" in
+    *' --no-pager diff --numstat HEAD')
+        op="numstat"; ref="HEAD"
+        qpath="${rest% --no-pager diff --numstat HEAD}"
+        ;;
     *' --no-pager diff --numstat')
-        op="numstat"
+        op="numstat"; ref=""
         qpath="${rest% --no-pager diff --numstat}"
         ;;
+    *' --no-pager diff HEAD')
+        op="diff"; ref="HEAD"
+        qpath="${rest% --no-pager diff HEAD}"
+        ;;
     *' --no-pager diff')
-        op="diff"
+        op="diff"; ref=""
         qpath="${rest% --no-pager diff}"
         ;;
     *' status --short')
-        op="status"
+        op="status"; ref=""
         qpath="${rest% status --short}"
         ;;
     *)
@@ -120,9 +131,11 @@ esac
 # Path must not start with '-' (would be interpreted as a flag)
 case "$path" in -*) reject "flag-path" ;; esac
 
-# exec replaces this shell — no further shell interpretation of $path
+# exec replaces this shell — no further shell interpretation of $path.
+# $ref is a controlled literal ("HEAD" or empty); unquoted so an empty ref
+# contributes no argument.
 case "$op" in
-    diff)    exec git -C "$path" --no-pager diff ;;
-    numstat) exec git -C "$path" --no-pager diff --numstat ;;
+    diff)    exec git -C "$path" --no-pager diff $ref ;;
+    numstat) exec git -C "$path" --no-pager diff --numstat $ref ;;
     status)  exec git -C "$path" status --short ;;
 esac

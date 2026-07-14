@@ -1,9 +1,10 @@
 # difflab git-gate — forced-command filter for the container SSH key (Windows/PowerShell).
 #
-# Allows ONLY these four command shapes:
+# Allows ONLY these command shapes (the trailing HEAD ref is optional so the
+# gate accepts app versions from before and after the diff-HEAD change):
 #   difflab-batch-status<US>path1<US>path2…  (batch status; <US>=0x1F)
-#   git -C "path" --no-pager diff
-#   git -C "path" --no-pager diff --numstat
+#   git -C "path" --no-pager diff [HEAD]
+#   git -C "path" --no-pager diff --numstat [HEAD]
 #   git -C "path" status --short
 #
 # Any other command is rejected with "difflab: command not permitted" (on stderr, exit 1).
@@ -55,18 +56,22 @@ foreach ($c in [char[]]"``;&|<>") {
     if ($original.IndexOf($c) -ge 0) { Reject 'metachar' }
 }
 
-# Match the three allowed forms.
+# Match the allowed forms.
 # The app always double-quotes paths and normalises backslashes to forward slashes.
 # Order: numstat before plain diff so the longer pattern is tried first.
-if ($original -match '^git\s+-C\s+"([^"]*)"\s+--no-pager\s+diff\s+--numstat\s*$') {
+# The trailing HEAD ref is optional and, when present, is passed through to git.
+if ($original -match '^git\s+-C\s+"([^"]*)"\s+--no-pager\s+diff\s+--numstat(\s+HEAD)?\s*$') {
     $path = $Matches[1]
     $op = 'numstat'
-} elseif ($original -match '^git\s+-C\s+"([^"]*)"\s+--no-pager\s+diff\s*$') {
+    $ref = if ($Matches[2]) { 'HEAD' } else { '' }
+} elseif ($original -match '^git\s+-C\s+"([^"]*)"\s+--no-pager\s+diff(\s+HEAD)?\s*$') {
     $path = $Matches[1]
     $op = 'diff'
+    $ref = if ($Matches[2]) { 'HEAD' } else { '' }
 } elseif ($original -match '^git\s+-C\s+"([^"]*)"\s+status\s+--short\s*$') {
     $path = $Matches[1]
     $op = 'status'
+    $ref = ''
 } else {
     Reject 'no-match'
 }
@@ -80,7 +85,13 @@ foreach ($c in [char[]]'`;&|<>"') {
 }
 
 switch ($op) {
-    'diff'    { & git -C $path --no-pager diff;          exit $LASTEXITCODE }
-    'numstat' { & git -C $path --no-pager diff --numstat; exit $LASTEXITCODE }
-    'status'  { & git -C $path status --short;           exit $LASTEXITCODE }
+    'diff'    {
+        if ($ref) { & git -C $path --no-pager diff HEAD } else { & git -C $path --no-pager diff }
+        exit $LASTEXITCODE
+    }
+    'numstat' {
+        if ($ref) { & git -C $path --no-pager diff --numstat HEAD } else { & git -C $path --no-pager diff --numstat }
+        exit $LASTEXITCODE
+    }
+    'status'  { & git -C $path status --short; exit $LASTEXITCODE }
 }

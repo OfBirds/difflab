@@ -273,6 +273,7 @@
     .status-row:focus-visible .copy-path-button,
     .copy-path-button.is-copied { opacity: 1; }
     .file-dialog {
+      display: none;
       width: min(96vw, 1100px);
       height: 92vh;
       max-width: none;
@@ -283,6 +284,7 @@
       color: var(--fg);
       padding: 0;
     }
+    dialog[open].file-dialog { display: block; }
     .file-dialog::backdrop { background: rgba(0, 0, 0, .55); }
     .dialog-bar {
       display: flex;
