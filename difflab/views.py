@@ -347,14 +347,11 @@ def register():
 def rescan(machine: str):
     """Re-walk a previously registered machine's roots and refresh its repos.
 
-    Picks up repos created since enrollment and drops ones that disappeared,
-    without requiring a full re-registration. Requires the enrollment token.
+    Reuses the host/user/port/roots recorded at enrollment, so it needs no
+    enrollment token — enrolling the machine already authorized that SSH
+    access. Picks up repos created since enrollment and drops ones that
+    disappeared, without requiring a full re-registration.
     """
-    body = request.get_json(force=True, silent=True) or {}
-    err = _check_enroll_token(body)
-    if err is not None:
-        return err
-
     key_path: Path | None = current_app.config.get("DIFFLAB_KEY_PATH")
     data_dir: Path = current_app.config["DIFFLAB_DATA_DIR"]
     if key_path is None:

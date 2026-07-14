@@ -691,17 +691,27 @@ def test_rescan_unknown_machine_returns_404(enroll_client, monkeypatch):
     assert "roots" in resp.get_json()["error"]
 
 
-def test_rescan_requires_token(enroll_app, monkeypatch):
+def test_rescan_needs_no_token(enroll_app, monkeypatch):
+    """Rescan reuses already-authorized enrollment params, so it takes no token."""
     _register_devbox(enroll_app, monkeypatch, ["/home/alice/projects/myrepo/.git"])
+    monkeypatch.setattr(enroll_mod, "_run_ssh",
+                        lambda argv: ("/home/alice/projects/myrepo/.git\n", "", 0))
     with enroll_app.test_client() as c:
-        resp = c.post("/rescan/devbox", json={"token": "wrong"})
-    assert resp.status_code == 401
+        resp = c.post("/rescan/devbox")  # no body, no token
+    assert resp.status_code == 200
+    assert "devbox-myrepo" in resp.get_json()["targets"]
 
 
-def test_rescan_disabled_when_no_env_token(enroll_client, monkeypatch):
+def test_rescan_works_even_when_enroll_token_unset(enroll_app, data_dir, monkeypatch):
+    """A machine registered earlier can still be rescanned after enrollment is
+    disabled (DIFFLAB_ENROLL_TOKEN unset)."""
+    _register_devbox(enroll_app, monkeypatch, ["/home/alice/projects/myrepo/.git"])
     monkeypatch.delenv("DIFFLAB_ENROLL_TOKEN", raising=False)
-    resp = enroll_client.post("/rescan/devbox", json={"token": "anything"})
-    assert resp.status_code == 503
+    monkeypatch.setattr(enroll_mod, "_run_ssh",
+                        lambda argv: ("/home/alice/projects/myrepo/.git\n", "", 0))
+    with enroll_app.test_client() as c:
+        resp = c.post("/rescan/devbox")
+    assert resp.status_code == 200
 
 
 def test_rescan_invalidates_status_cache(enroll_app, monkeypatch):
@@ -713,5 +723,5 @@ def test_rescan_invalidates_status_cache(enroll_app, monkeypatch):
     monkeypatch.setattr(enroll_mod, "_run_ssh",
                         lambda argv: ("/home/alice/projects/myrepo/.git\n", "", 0))
     with enroll_app.test_client() as c:
-        c.post("/rescan/devbox", json={"token": TOKEN})
+        c.post("/rescan/devbox")
     assert "devbox" in invalidated

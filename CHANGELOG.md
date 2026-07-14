@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Machine rescan** (`POST /rescan/<machine>`) — refresh a registered machine's tracked
   repos without re-registering it. A `roots`-based enrollment now records the machine's
   `host`/`user`/`port`/`roots` in `registry.yaml`; a rescan re-walks those roots, adds repos
-  that appeared, and drops repos that were removed. The index page gains a **Rescan a
-  machine** control (token-gated, same as `/register`). Explicit-`repos` enrollments record
-  no roots and are not rescannable.
+  that appeared, and drops repos that were removed. Needs no enrollment token — enrolling the
+  machine already authorized the SSH access the rescan reuses — so the index page's **Rescan
+  a machine** control works with one click. Explicit-`repos` enrollments record no roots and
+  are not rescannable.
 
 ### Fixed
 

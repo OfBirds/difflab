@@ -113,20 +113,19 @@ Enrolled targets are stored in `$DIFFLAB_DATA/registry.yaml` and survive restart
 
 The repo list is captured at enrollment. To pick up repos created since — or drop ones
 that were removed — **rescan** the machine instead of re-registering it. Rescans reuse the
-`roots` recorded at enrollment (so this only works for `roots`-based registrations):
+`roots` recorded at enrollment (so this only works for `roots`-based registrations), and
+need **no token** — enrolling the machine already authorized the SSH access a rescan reuses:
 
 ```bash
-curl -s -X POST http://difflab.example.com:8747/rescan/devbox \
-  -H 'Content-Type: application/json' \
-  -d '{"token": "YOUR_ENROLL_TOKEN"}'
+curl -s -X POST http://difflab.example.com:8747/rescan/devbox
 ```
 ```json
 {"machine": "devbox", "targets": ["devbox-myproject", "devbox-newrepo"],
  "added": ["devbox-newrepo"], "removed": ["devbox-other"], "errors": []}
 ```
 
-The index page also has a **Rescan a machine** control (enter the enrollment token) that
-does the same thing from the browser.
+The index page also has a **Rescan a machine** control that does the same thing from the
+browser with one click.
 
 Full guide: [Enrolling machines](https://ofbirds.org/docs/kingfisher/enrollment.html).
 
@@ -165,7 +164,7 @@ Full reference: [Configuration reference](https://ofbirds.org/docs/kingfisher/co
 | `/raw/<name>` | Plain-text diff (`text/plain`) |
 | `GET /pubkey` | Container's SSH public key as an `authorized_keys` line |
 | `POST /register` | Self-service machine enrollment (token-gated) |
-| `POST /rescan/<machine>` | Re-walk a registered machine's roots; refresh its repos (token-gated) |
+| `POST /rescan/<machine>` | Re-walk a registered machine's roots; refresh its repos (no token) |
 
 ## Security model
 

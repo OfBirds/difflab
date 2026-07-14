@@ -158,13 +158,12 @@ can be repeated later (see below).
 The set of repos is captured when the machine is enrolled. When you create a new repo under a
 tracked root — or delete one — refresh the machine with a **rescan** instead of re-registering
 it. A rescan re-walks the `roots` recorded at enrollment, adds repos that appeared, and drops
-repos that are gone:
+repos that are gone. It needs **no enrollment token** — enrolling the machine already
+authorized the SSH access the rescan reuses:
 
 [source,bash]
 ----
-curl -s -X POST http://difflab.example.com:8747/rescan/devbox \
-  -H 'Content-Type: application/json' \
-  -d '{"token": "YOUR_ENROLL_TOKEN"}'
+curl -s -X POST http://difflab.example.com:8747/rescan/devbox
 ----
 
 [source,json]
@@ -173,8 +172,7 @@ curl -s -X POST http://difflab.example.com:8747/rescan/devbox \
  "added": ["devbox-newrepo"], "removed": ["devbox-other"], "errors": []}
 ----
 
-The index page exposes the same action as a **Rescan a machine** control (it prompts for the
-enrollment token).
+The index page exposes the same action as a one-click **Rescan a machine** control.
 
 [NOTE]
 ====
