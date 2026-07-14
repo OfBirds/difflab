@@ -37,6 +37,7 @@ def create_app(config_path: str | None = None) -> Flask:
     merged = merge_targets(targets, reg_targets)
 
     app.config["DIFFLAB_TARGETS"] = merged
+    app.config["DIFFLAB_CONFIG_TARGETS"] = targets
     app.config["DIFFLAB_KEY_PATH"] = key_path
     app.config["DIFFLAB_PUBKEY_LINE"] = pub_line
     app.config["DIFFLAB_DATA_DIR"] = data_dir

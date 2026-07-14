@@ -122,6 +122,22 @@
     .refresh-button:hover,
     .file-dialog-button:hover,
     .dialog-close:hover { border-color: var(--link); text-decoration: none; }
+    .refresh-button:disabled { opacity: .5; cursor: default; }
+    .rescan-panel { margin: .25rem 0 1rem; font-size: .85rem; }
+    .rescan-panel summary { cursor: pointer; color: var(--link); }
+    .rescan-help { margin: .5rem 0 .25rem; opacity: .75; max-width: 60ch; }
+    .rescan-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem; margin-top: .4rem; }
+    .rescan-form label { display: flex; flex-direction: column; gap: .2rem; }
+    .rescan-form input, .rescan-form select {
+      padding: .25rem .4rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      border-radius: 4px;
+      font-family: var(--font-ui);
+      font-size: .8rem;
+    }
+    .rescan-status { opacity: .85; align-self: center; }
     table { border-collapse: collapse; width: 100%; }
     th, td { text-align: left; padding: .4rem .8rem; border-bottom: 1px solid var(--border); }
     th { font-weight: 600; }

@@ -149,6 +149,41 @@ Invoke-RestMethod http://difflab.example.com:8747/register -Method POST `
 `targets` lists the names of the discovered repos now tracked by difflab.
 `errors` lists any paths that could not be verified as git repositories.
 
+A `roots`-based enrollment tracks **every** git repo found under the roots — there is no
+per-repo opt-in. difflab also records the machine's `host`/`user`/`port`/`roots` so the scan
+can be repeated later (see below).
+
+== Refreshing a machine's repos
+
+The set of repos is captured when the machine is enrolled. When you create a new repo under a
+tracked root — or delete one — refresh the machine with a **rescan** instead of re-registering
+it. A rescan re-walks the `roots` recorded at enrollment, adds repos that appeared, and drops
+repos that are gone:
+
+[source,bash]
+----
+curl -s -X POST http://difflab.example.com:8747/rescan/devbox \
+  -H 'Content-Type: application/json' \
+  -d '{"token": "YOUR_ENROLL_TOKEN"}'
+----
+
+[source,json]
+----
+{"machine": "devbox", "targets": ["devbox-myproject", "devbox-newrepo"],
+ "added": ["devbox-newrepo"], "removed": ["devbox-other"], "errors": []}
+----
+
+The index page exposes the same action as a **Rescan a machine** control (it prompts for the
+enrollment token).
+
+[NOTE]
+====
+Rescan only works for machines enrolled with `roots` (an explicit `repos` enrollment records no
+roots to re-walk, and returns `404`). Because a rescan runs the same `find` / `Get-ChildItem`
+scan as registration, it is subject to the same gate restriction — gated hosts must be updated
+by re-registering with an explicit `repos` list.
+====
+
 == Enabling OpenSSH Server on Windows
 
 If the target is a Windows machine without SSH enabled:

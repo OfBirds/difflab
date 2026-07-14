@@ -15,10 +15,18 @@ from flask import (
     url_for,
 )
 
-from difflab.config import Target
 from difflab.enroll import EnrollError, SSHError, discover_repos, validate_body
 from difflab.gitops import GitError, get_diff, get_numstat, get_status
-from difflab.registry import load_registry, save_registry, upsert_target
+from difflab.registry import (
+    get_machine,
+    load_registry,
+    merge_targets,
+    prune_machine_targets,
+    registry_to_targets,
+    save_registry,
+    upsert_machine,
+    upsert_target,
+)
 from difflab.render import parse_numstat, parse_status_rows, render_diff_html
 from difflab.sshkey import get_public_key_line
 import difflab.status_service as status_service
@@ -39,6 +47,24 @@ def set_cache_headers(response):
     else:
         response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+def _rebuild_app_targets(app_config, reg_data: dict) -> None:
+    """Recompute DIFFLAB_TARGETS from config targets + the current registry."""
+    reg_targets = registry_to_targets(reg_data)
+    config_targets = app_config["DIFFLAB_CONFIG_TARGETS"]
+    app_config["DIFFLAB_TARGETS"] = merge_targets(config_targets, reg_targets)
+
+
+def _check_enroll_token(body: dict):
+    """Return None if authorized, else an (payload, status) error tuple."""
+    token = os.environ.get("DIFFLAB_ENROLL_TOKEN")
+    if not token:
+        return {"error": "enrollment disabled"}, 503
+    submitted = str(body.get("token") or "")
+    if not hmac.compare_digest(submitted, token):
+        return {"error": "unauthorized"}, 401
+    return None
 
 
 def _get_target(name: str):
@@ -252,14 +278,10 @@ def pubkey():
 
 @bp.post("/register")
 def register():
-    token = os.environ.get("DIFFLAB_ENROLL_TOKEN")
-    if not token:
-        return {"error": "enrollment disabled"}, 503
-
     body = request.get_json(force=True, silent=True) or {}
-    submitted = str(body.get("token") or "")
-    if not hmac.compare_digest(submitted, token):
-        return {"error": "unauthorized"}, 401
+    err = _check_enroll_token(body)
+    if err is not None:
+        return err
 
     try:
         name, host, user, port, roots, repos = validate_body(body)
@@ -304,22 +326,102 @@ def register():
         taken.add(final_name)
         new_targets.append({**entry, "name": final_name})
 
-    save_registry(data_dir, reg_data)
+    # Persist enrollment params for roots-based machines so they can be
+    # rescanned later without re-registering. Explicit-repos enrollments carry
+    # no roots to walk, so they are not recorded as rescannable machines.
+    if roots and not repos:
+        upsert_machine(reg_data, name, host, user, port, roots)
 
-    for t in new_targets:
-        existing[t["name"]] = Target(
-            name=t["name"],
-            machine=t["machine"],
-            repo=t["repo"],
-            ssh_host=t["ssh_host"],
-            port=t["port"],
-            shell=t.get("shell", "posix"),
-        )
-    current_app.config["DIFFLAB_TARGETS"] = existing
+    save_registry(data_dir, reg_data)
+    _rebuild_app_targets(current_app.config, reg_data)
     status_service.invalidate(name)
 
     return {
         "machine": name,
         "targets": [t["name"] for t in new_targets],
+        "errors": disc_errors,
+    }
+
+
+@bp.post("/rescan/<machine>")
+def rescan(machine: str):
+    """Re-walk a previously registered machine's roots and refresh its repos.
+
+    Picks up repos created since enrollment and drops ones that disappeared,
+    without requiring a full re-registration. Requires the enrollment token.
+    """
+    body = request.get_json(force=True, silent=True) or {}
+    err = _check_enroll_token(body)
+    if err is not None:
+        return err
+
+    key_path: Path | None = current_app.config.get("DIFFLAB_KEY_PATH")
+    data_dir: Path = current_app.config["DIFFLAB_DATA_DIR"]
+    if key_path is None:
+        return {"error": "SSH keypair not initialized; rescan unavailable."}, 503
+
+    reg_data = load_registry(data_dir)
+    record = get_machine(reg_data, machine)
+    if not record or not record.get("roots"):
+        return {
+            "error": (
+                f"No rescannable roots recorded for machine {machine!r}. "
+                "Register it with a 'roots' list first."
+            )
+        }, 404
+
+    host = record["host"]
+    user = record["user"]
+    port = record.get("port", 22)
+    roots = record.get("roots", [])
+
+    try:
+        found_repos, disc_errors, detected_shell = discover_repos(
+            host, user, port, key_path, roots, []
+        )
+    except SSHError as exc:
+        return {
+            "error": (
+                f"SSH connection failed: {exc}. "
+                "Add the container's public key (GET /pubkey) to the host's authorized_keys."
+            )
+        }, 502
+
+    ssh_host = f"{user}@{host}"
+
+    config_targets = current_app.config["DIFFLAB_CONFIG_TARGETS"]
+    taken: set[str] = set(config_targets) | {
+        t["name"] for t in reg_data.get("targets", [])
+    }
+
+    added: list[str] = []
+    for repo in found_repos:
+        entry = {
+            "machine": machine,
+            "repo": repo,
+            "ssh_host": ssh_host,
+            "port": port,
+            "shell": detected_shell,
+        }
+        final_name, replaced = upsert_target(reg_data, entry, taken)
+        taken.add(final_name)
+        if not replaced:
+            added.append(final_name)
+
+    removed = prune_machine_targets(reg_data, machine, found_repos)
+
+    save_registry(data_dir, reg_data)
+    _rebuild_app_targets(current_app.config, reg_data)
+    status_service.invalidate(machine)
+
+    current = [
+        t["name"] for t in reg_data.get("targets", [])
+        if t.get("machine") == machine
+    ]
+    return {
+        "machine": machine,
+        "targets": current,
+        "added": added,
+        "removed": removed,
         "errors": disc_errors,
     }

@@ -585,3 +585,133 @@ def test_register_calls_status_service_invalidate(enroll_app, monkeypatch):
         c.post("/register", json=VALID_BODY)
 
     assert "devbox" in invalidated
+
+
+# ──────────────────────────────────────────────
+# /rescan — refresh a registered machine's repos
+# ──────────────────────────────────────────────
+
+def _register_devbox(app, monkeypatch, repos_git):
+    """Helper: register 'devbox' with a fake scan returning repos_git (list of
+    .git paths), leaving the machine record persisted for later rescans."""
+    monkeypatch.setenv("DIFFLAB_ENROLL_TOKEN", TOKEN)
+
+    def fake_find(argv):
+        last = argv[-1]
+        if "find" in last or "Get-ChildItem" in last:
+            return "\n".join(repos_git) + "\n", "", 0
+        return "", "", 0
+
+    monkeypatch.setattr(enroll_mod, "_run_ssh", fake_find)
+    with app.test_client() as c:
+        resp = c.post("/register", json=VALID_BODY)
+    assert resp.status_code == 200
+    return resp.get_json()
+
+
+def test_register_persists_machine_record(enroll_app, data_dir, monkeypatch):
+    _register_devbox(enroll_app, monkeypatch, ["/home/alice/projects/myrepo/.git"])
+    reg = yaml.safe_load((data_dir / "registry.yaml").read_text(encoding="utf-8"))
+    assert reg.get("machines", {}).get("devbox") == {
+        "host": "192.0.2.10",
+        "user": "alice",
+        "port": 22,
+        "roots": ["/home/alice/projects"],
+    }
+
+
+def test_register_explicit_repos_records_no_machine(enroll_app, data_dir, monkeypatch):
+    """Explicit repos= enrollment carries no roots, so no rescannable record."""
+    monkeypatch.setenv("DIFFLAB_ENROLL_TOKEN", TOKEN)
+    monkeypatch.setattr(enroll_mod, "_run_ssh", lambda argv: ("true\n", "", 0))
+    body = {**VALID_BODY, "repos": ["/home/alice/myrepo"], "roots": []}
+    with enroll_app.test_client() as c:
+        resp = c.post("/register", json=body)
+    assert resp.status_code == 200
+    reg = yaml.safe_load((data_dir / "registry.yaml").read_text(encoding="utf-8"))
+    assert "devbox" not in (reg.get("machines") or {})
+
+
+def test_rescan_picks_up_new_repo(enroll_app, monkeypatch):
+    _register_devbox(enroll_app, monkeypatch, ["/home/alice/projects/myrepo/.git"])
+
+    # Now a second repo exists on the host
+    def fake_find(argv):
+        last = argv[-1]
+        if "find" in last or "Get-ChildItem" in last:
+            return ("/home/alice/projects/myrepo/.git\n"
+                    "/home/alice/projects/newrepo/.git\n"), "", 0
+        return "", "", 0
+
+    monkeypatch.setattr(enroll_mod, "_run_ssh", fake_find)
+    with enroll_app.test_client() as c:
+        resp = c.post("/rescan/devbox", json={"token": TOKEN})
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "devbox-newrepo" in data["added"]
+    assert "devbox-newrepo" in data["targets"]
+    assert data["removed"] == []
+
+    with enroll_app.app_context():
+        assert "devbox-newrepo" in enroll_app.config["DIFFLAB_TARGETS"]
+
+
+def test_rescan_prunes_removed_repo(enroll_app, monkeypatch):
+    _register_devbox(enroll_app, monkeypatch, [
+        "/home/alice/projects/myrepo/.git",
+        "/home/alice/projects/gone/.git",
+    ])
+
+    # 'gone' no longer present on rescan
+    def fake_find(argv):
+        last = argv[-1]
+        if "find" in last or "Get-ChildItem" in last:
+            return "/home/alice/projects/myrepo/.git\n", "", 0
+        return "", "", 0
+
+    monkeypatch.setattr(enroll_mod, "_run_ssh", fake_find)
+    with enroll_app.test_client() as c:
+        resp = c.post("/rescan/devbox", json={"token": TOKEN})
+
+    data = resp.get_json()
+    assert "devbox-gone" in data["removed"]
+    assert "devbox-gone" not in data["targets"]
+    assert "devbox-myrepo" in data["targets"]
+
+    with enroll_app.app_context():
+        assert "devbox-gone" not in enroll_app.config["DIFFLAB_TARGETS"]
+        assert "devbox-myrepo" in enroll_app.config["DIFFLAB_TARGETS"]
+
+
+def test_rescan_unknown_machine_returns_404(enroll_client, monkeypatch):
+    monkeypatch.setenv("DIFFLAB_ENROLL_TOKEN", TOKEN)
+    resp = enroll_client.post("/rescan/nosuch", json={"token": TOKEN})
+    assert resp.status_code == 404
+    assert "roots" in resp.get_json()["error"]
+
+
+def test_rescan_requires_token(enroll_app, monkeypatch):
+    _register_devbox(enroll_app, monkeypatch, ["/home/alice/projects/myrepo/.git"])
+    with enroll_app.test_client() as c:
+        resp = c.post("/rescan/devbox", json={"token": "wrong"})
+    assert resp.status_code == 401
+
+
+def test_rescan_disabled_when_no_env_token(enroll_client, monkeypatch):
+    monkeypatch.delenv("DIFFLAB_ENROLL_TOKEN", raising=False)
+    resp = enroll_client.post("/rescan/devbox", json={"token": "anything"})
+    assert resp.status_code == 503
+
+
+def test_rescan_invalidates_status_cache(enroll_app, monkeypatch):
+    import difflab.status_service as ss
+    _register_devbox(enroll_app, monkeypatch, ["/home/alice/projects/myrepo/.git"])
+
+    invalidated = []
+    monkeypatch.setattr(ss, "invalidate", lambda machine=None: invalidated.append(machine))
+    monkeypatch.setattr(enroll_mod, "_run_ssh",
+                        lambda argv: ("/home/alice/projects/myrepo/.git\n", "", 0))
+    with enroll_app.test_client() as c:
+        c.post("/rescan/devbox", json={"token": TOKEN})
+    assert "devbox" in invalidated

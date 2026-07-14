@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Machine rescan** (`POST /rescan/<machine>`) — refresh a registered machine's tracked
+  repos without re-registering it. A `roots`-based enrollment now records the machine's
+  `host`/`user`/`port`/`roots` in `registry.yaml`; a rescan re-walks those roots, adds repos
+  that appeared, and drops repos that were removed. The index page gains a **Rescan a
+  machine** control (token-gated, same as `/register`). Explicit-`repos` enrollments record
+  no roots and are not rescannable.
+
 ### Fixed
 
 - **Git-gate rejected diff after the `diff HEAD` change** — the app started sending

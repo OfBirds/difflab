@@ -6,6 +6,24 @@
   Checking {{ total_count }} repo{% if total_count != 1 %}s{% endif %} on {{ machines|length }} machine{% if machines|length != 1 %}s{% endif %}…
 </p>
 <noscript><p style="margin-bottom:.75rem">Enable JavaScript for live status; rows below list all configured targets.</p></noscript>
+<details class="rescan-panel">
+  <summary>Rescan a machine</summary>
+  <p class="rescan-help">Re-walks a registered machine's roots to pick up new repos and drop removed ones — no re-registration needed. Requires the enrollment token.</p>
+  <form id="rescan-form" class="rescan-form">
+    <label>Machine
+      <select id="rescan-machine">
+        {% for machine in machines.keys() %}
+        <option value="{{ machine }}">{{ machine }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Enrollment token
+      <input type="password" id="rescan-token" autocomplete="off" />
+    </label>
+    <button type="submit" class="refresh-button">Rescan</button>
+    <span id="rescan-status" class="rescan-status" role="status" aria-live="polite"></span>
+  </form>
+</details>
 <table>
   <thead>
     <tr>
@@ -196,6 +214,40 @@ var MACHINES = {{ machines.keys()|list|tojson }};
       rows.forEach(function (r) { tbody.appendChild(r); });
     });
   });
+
+  var rescanForm = document.getElementById('rescan-form');
+  if (rescanForm) {
+    rescanForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var machine = document.getElementById('rescan-machine').value;
+      var token = document.getElementById('rescan-token').value;
+      var statusEl = document.getElementById('rescan-status');
+      var btn = rescanForm.querySelector('button');
+      btn.disabled = true;
+      statusEl.textContent = 'Rescanning ' + machine + '…';
+      fetch('/rescan/' + encodeURIComponent(machine), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token })
+      }).then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      }).then(function (res) {
+        if (!res.ok) {
+          btn.disabled = false;
+          statusEl.textContent = 'Error: ' + (res.data.error || 'rescan failed');
+          return;
+        }
+        var added = (res.data.added || []).length;
+        var removed = (res.data.removed || []).length;
+        statusEl.textContent = 'Done — ' + added + ' added, ' + removed + ' removed. Reloading…';
+        try { sessionStorage.setItem(FORCE_KEY, '1'); } catch (e) {}
+        setTimeout(function () { window.location.reload(); }, 700);
+      }).catch(function () {
+        btn.disabled = false;
+        statusEl.textContent = 'Rescan request failed.';
+      });
+    });
+  }
 })();
 </script>
 {% endblock %}

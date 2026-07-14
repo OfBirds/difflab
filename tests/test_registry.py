@@ -7,7 +7,10 @@ from difflab import create_app
 from difflab.registry import (
     dedupe_registry,
     find_by_repo,
+    get_machine,
     normalize_repo_path,
+    prune_machine_targets,
+    upsert_machine,
     upsert_target,
 )
 
@@ -196,3 +199,62 @@ def test_create_app_heals_registry_duplicates(tmp_path, monkeypatch):
     names = [t["name"] for t in reg["targets"]]
     assert "dev-App" in names
     assert "dev-App-2" not in names
+
+
+# ── Machine records + rescan pruning ──────────────────────────────────────────
+
+def test_upsert_machine_stores_enrollment_params():
+    reg = {"targets": []}
+    upsert_machine(reg, "devbox", "192.0.2.10", "alice", 2222, ["/home/alice/projects"])
+    record = get_machine(reg, "devbox")
+    assert record == {
+        "host": "192.0.2.10",
+        "user": "alice",
+        "port": 2222,
+        "roots": ["/home/alice/projects"],
+    }
+
+
+def test_upsert_machine_overwrites_existing():
+    reg = {"machines": {"devbox": {"host": "old", "user": "old", "port": 22, "roots": ["/a"]}}}
+    upsert_machine(reg, "devbox", "192.0.2.10", "alice", 22, ["/b"])
+    assert get_machine(reg, "devbox")["host"] == "192.0.2.10"
+    assert get_machine(reg, "devbox")["roots"] == ["/b"]
+
+
+def test_get_machine_missing_returns_none():
+    assert get_machine({"targets": []}, "nope") is None
+    assert get_machine({"machines": {}}, "nope") is None
+
+
+def test_prune_machine_targets_drops_missing_repos():
+    reg = {"targets": [
+        {"name": "dev-a", "machine": "dev", "repo": "/home/alice/a"},
+        {"name": "dev-b", "machine": "dev", "repo": "/home/alice/b"},
+        {"name": "dev-c", "machine": "dev", "repo": "/home/alice/c"},
+    ]}
+    removed = prune_machine_targets(reg, "dev", ["/home/alice/a", "/home/alice/c"])
+    assert removed == ["dev-b"]
+    names = [t["name"] for t in reg["targets"]]
+    assert names == ["dev-a", "dev-c"]
+
+
+def test_prune_machine_targets_leaves_other_machines_alone():
+    reg = {"targets": [
+        {"name": "dev-a", "machine": "dev", "repo": "/home/alice/a"},
+        {"name": "prod-x", "machine": "prod", "repo": "/home/alice/x"},
+    ]}
+    removed = prune_machine_targets(reg, "dev", [])
+    assert removed == ["dev-a"]
+    # prod-x untouched even though it wasn't in keep_repos
+    assert [t["name"] for t in reg["targets"]] == ["prod-x"]
+
+
+def test_prune_machine_targets_normalizes_paths():
+    reg = {"targets": [
+        {"name": "dev-a", "machine": "dev", "repo": "/home/alice/a/"},
+    ]}
+    # trailing-slash difference must still match and keep the entry
+    removed = prune_machine_targets(reg, "dev", ["/home/alice/a"])
+    assert removed == []
+    assert [t["name"] for t in reg["targets"]] == ["dev-a"]

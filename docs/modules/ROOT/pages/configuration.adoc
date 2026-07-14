@@ -108,4 +108,8 @@ priority when names conflict.
 
 | `POST /register`
 | Enroll a machine. Token-gated via `DIFFLAB_ENROLL_TOKEN`. Returns 503 if token is unset.
+
+| `POST /rescan/<machine>`
+| Re-walk a registered machine's roots to refresh its tracked repos. Token-gated via
+  `DIFFLAB_ENROLL_TOKEN`. Returns 404 if the machine has no recorded roots.
 |===

@@ -62,6 +62,54 @@ def upsert_target(reg_data: dict, entry: dict, taken: set[str]) -> tuple[str, bo
     return name, False
 
 
+def upsert_machine(
+    reg_data: dict,
+    name: str,
+    host: str,
+    user: str,
+    port: int,
+    roots: list[str],
+) -> None:
+    """Persist a machine's enrollment parameters so it can be rescanned later.
+
+    Stored under reg_data['machines'][name]; only roots-based enrollments are
+    recorded (an explicit repos list carries no roots to walk on a rescan).
+    """
+    machines = reg_data.setdefault("machines", {})
+    machines[name] = {
+        "host": host,
+        "user": user,
+        "port": port,
+        "roots": list(roots),
+    }
+
+
+def get_machine(reg_data: dict, name: str) -> dict | None:
+    return (reg_data.get("machines") or {}).get(name)
+
+
+def prune_machine_targets(
+    reg_data: dict, machine: str, keep_repos: list[str]
+) -> list[str]:
+    """Drop targets for ``machine`` whose repo is no longer in ``keep_repos``.
+
+    Returns the names of the removed targets. Targets belonging to other
+    machines are left untouched.
+    """
+    keep = {normalize_repo_path(r) for r in keep_repos}
+    removed: list[str] = []
+    kept: list[dict] = []
+    for t in reg_data.get("targets", []):
+        if (t.get("machine") == machine
+                and normalize_repo_path(t.get("repo", "")) not in keep):
+            removed.append(t.get("name", ""))
+        else:
+            kept.append(t)
+    if removed:
+        reg_data["targets"] = kept
+    return removed
+
+
 def dedupe_registry(reg_data: dict) -> bool:
     targets = reg_data.get("targets", [])
     if not targets:
