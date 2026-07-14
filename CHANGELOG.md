@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Git-gate rejected diff after the `diff HEAD` change** — the app started sending
+  `git … diff HEAD` / `diff --numstat HEAD` (to include staged files) but the
+  forced-command gate (`gate/git-gate.sh`, `gate/git-gate.ps1`) only permitted the
+  ref-less forms, so gated (remote/homelab) machines surfaced "Remote gate refused
+  command" on the diff view. The gate now accepts an optional trailing `HEAD` and
+  passes it through to git; the ref-less forms still work for older app builds, and
+  arbitrary refs remain rejected. **Deploying this requires reinstalling the gate
+  script on each enrolled machine.**
+
 ## [0.2.0] - 2026-07-12
 
 ### Added
