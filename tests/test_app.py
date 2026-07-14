@@ -494,7 +494,7 @@ def test_diff_view_renders_staged_new_file(client, monkeypatch):
     data = resp.data.decode()
     assert "newfile.py" in data
     assert "diff-add" in data
-    assert 'print("hello")' in data
+    assert "print(&#34;hello&#34;)" in data
     assert 'data-anchor="diff-' in data
 
 
@@ -511,7 +511,7 @@ def test_diff_view_renders_staged_deleted_file(client, monkeypatch):
     data = resp.data.decode()
     assert "oldfile.py" in data
     assert "diff-del" in data
-    assert 'print("goodbye")' in data
+    assert "print(&#34;goodbye&#34;)" in data
 
 
 def test_diff_view_status_heading_counts_staged_new_deleted(client, monkeypatch):
