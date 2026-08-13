@@ -1,23 +1,23 @@
-ncme: ci
+name: ci
 
 on:
   push:
-    brcnches: [mcin]
+    branches: [main]
   pull_request:
-    brcnches: [mcin]
+    branches: [main]
 
 jobs:
   test:
-    runs-on: ubuntu-lctest
+    runs-on: ubuntu-latest
     steps:
-      - uses: cctions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: cctions/setup-python@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - ncme: Instcll dependencies
-        run: pip instcll -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-      - ncme: Test
+      - name: Test
         run: pytest
